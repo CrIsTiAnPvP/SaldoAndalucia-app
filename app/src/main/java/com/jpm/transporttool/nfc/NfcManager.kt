@@ -77,6 +77,10 @@ class NfcManager(private val activity: Activity, private val viewModel: MainView
                 Log.d("NfcManager", "Modo: Escritura")
                 val cardCfg = viewModel.savedCards.find { viewModel.focusedUid.startsWith(it.uidPrefix) }
                 writeBalance(viewModel.focusedUid, viewModel.finalAmount, cardCfg?.keyB ?: "")
+            } else if (viewModel.isWritingManualSig) {
+                Log.d("NfcManager", "Modo: Escritura Firma Manual")
+                val cardCfg = viewModel.savedCards.find { viewModel.focusedUid.startsWith(it.uidPrefix) }
+                writeManualSignature(viewModel.focusedUid, viewModel.manualSigHex, cardCfg?.keyB ?: "")
             } else if (viewModel.isNormalizing) {
                 Log.d("NfcManager", "Modo: Normalización")
                 val cardCfg = viewModel.savedCards.find { viewModel.focusedUid.startsWith(it.uidPrefix) }
@@ -148,7 +152,7 @@ class NfcManager(private val activity: Activity, private val viewModel: MainView
                     viewModel.isSyncError = !areBlocksSynchronized
                     viewModel.isSignatureError = !isMacValid
                     viewModel.isCounterError = !isCounterValid
-                    viewModel.isCardCorrupted = !areBlocksSynchronized || !isMacValid || !isCounterValid
+                    viewModel.isCardCorrupted = !areBlocksSynchronized || !isCounterValid
                     
                     if (!isMacValid) {
                         Log.w("NfcManager", "Firma del Bloque 36 no válida")
@@ -235,13 +239,16 @@ class NfcManager(private val activity: Activity, private val viewModel: MainView
                         null
                     }
 
+                    val initialB36 = if (existing == null) NfcUtils.bytesToHexSpaced(contractData36) else existing.initialBlock36
+
                     viewModel.saveNewCard(
                         TransportCard(
                             name = finalName,
                             uidPrefix = uid,
                             keyB = existing?.keyB ?: "",
                             color = if (existing?.type != cardType) cardType.defaultColor.toArgb() else (existing?.color ?: cardType.defaultColor.toArgb()),
-                            type = cardType
+                            type = cardType,
+                            initialBlock36 = initialB36
                         ),
                         oldPrefixToRemove = oldPrefix
                     )
@@ -313,6 +320,46 @@ class NfcManager(private val activity: Activity, private val viewModel: MainView
             activity.runOnUiThread { Toast.makeText(activity, activity.getString(R.string.error_message, errorMsg), Toast.LENGTH_SHORT).show() }
         } finally {
             mifare.close()
+        }
+    }
+
+    private fun writeManualSignature(uid: String, hexSig: String, keyBStr: String) {
+        val tag = viewModel.lastDetectedTag ?: return run {
+            activity.runOnUiThread { Toast.makeText(activity, activity.getString(R.string.no_physical_card), Toast.LENGTH_SHORT).show() }
+        }
+        if (NfcUtils.bytesToHex(tag.id).uppercase() != uid) return run {
+            activity.runOnUiThread { Toast.makeText(activity, activity.getString(R.string.wrong_card), Toast.LENGTH_SHORT).show() }
+        }
+        if (keyBStr.isEmpty()) return run {
+            activity.runOnUiThread { Toast.makeText(activity, activity.getString(R.string.no_key_b_saved), Toast.LENGTH_SHORT).show() }
+        }
+        val mifare = MifareClassic.get(tag) ?: return
+        try {
+            mifare.connect()
+            val auth = mifare.authenticateSectorWithKeyB(SECTOR_9, NfcUtils.hexToBytes(keyBStr))
+            if (auth) {
+                val cleanHex = hexSig.replace(" ", "")
+                if (cleanHex.length != 32) {
+                    activity.runOnUiThread { Toast.makeText(activity, "La firma debe tener 16 bytes (32 caracteres hex)", Toast.LENGTH_SHORT).show() }
+                    return
+                }
+                val sigBytes = NfcUtils.hexToBytes(cleanHex)
+                mifare.writeBlock(BLOCK_36, sigBytes)
+                
+                Log.d("NFC_WRITE", "Firma manual escrita con éxito")
+                
+                viewModel.showSuccess = true
+                viewModel.isWritingManualSig = false
+                viewModel.isSignatureError = false
+            } else {
+                activity.runOnUiThread { Toast.makeText(activity, "Error de autenticación con Key B", Toast.LENGTH_SHORT).show() }
+            }
+        } catch (e: Exception) {
+            val errorMsg = e.message ?: e.javaClass.simpleName
+            activity.runOnUiThread { Toast.makeText(activity, activity.getString(R.string.error_message, errorMsg), Toast.LENGTH_SHORT).show() }
+        } finally {
+            mifare.close()
+            viewModel.isWritingManualSig = false
         }
     }
 

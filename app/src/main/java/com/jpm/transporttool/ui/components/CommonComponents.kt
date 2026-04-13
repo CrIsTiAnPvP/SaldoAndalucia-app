@@ -71,7 +71,11 @@ fun TransportCardItem(
     onDelete: (() -> Unit)? = null,
     initialKeyB: String = "",
     isProMode: Boolean = false,
-    pageOffset: Float = 0f
+    pageOffset: Float = 0f,
+    isCorrupted: Boolean = false,
+    isSyncError: Boolean = false,
+    isSignatureError: Boolean = false,
+    isCounterError: Boolean = false
 ) {
     var isFlipped by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(

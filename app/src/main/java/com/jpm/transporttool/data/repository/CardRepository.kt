@@ -25,7 +25,8 @@ class CardRepository(context: Context) {
                     obj.getString("prefix"),
                     obj.getString("keyB"),
                     obj.optInt("color", -15102190),
-                    CardType.valueOf(obj.optString("type", "UNKNOWN"))
+                    CardType.valueOf(obj.optString("type", "UNKNOWN")),
+                    if (obj.has("initialBlock36")) obj.getString("initialBlock36") else null
                 )
             )
         }
@@ -41,6 +42,7 @@ class CardRepository(context: Context) {
             obj.put("keyB", it.keyB)
             obj.put("color", it.color)
             obj.put("type", it.type.name)
+            it.initialBlock36?.let { sig -> obj.put("initialBlock36", sig) }
             array.put(obj)
         }
         appPrefs.edit().putString("cards", array.toString()).apply()

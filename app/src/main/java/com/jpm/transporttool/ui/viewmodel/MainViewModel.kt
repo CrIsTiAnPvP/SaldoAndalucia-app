@@ -52,6 +52,11 @@ class MainViewModel(private val repository: CardRepository) : ViewModel() {
     var currentBalance by mutableFloatStateOf(0f)
     var isNormalizing by mutableStateOf(false)
     var isRepairSuccess by mutableStateOf(false)
+    var isSignatureSuccess by mutableStateOf(false)
+
+    var showManualSigDialog by mutableStateOf(false)
+    var manualSigHex by mutableStateOf("")
+    var isWritingManualSig by mutableStateOf(false)
 
     var showTravelHistoryOnly by mutableStateOf(false)
 
@@ -124,8 +129,8 @@ class MainViewModel(private val repository: CardRepository) : ViewModel() {
         val currentCards = savedCards.toMutableList()
         val newUidNorm = card.uidPrefix.replace(" ", "").uppercase()
         
-        // Limpiar cualquier versión previa que coincida (con o sin espacios, o el prefijo antiguo)
-        currentCards.removeAll { 
+        // Encontrar índice para mantener posición
+        val existingIndex = currentCards.indexOfFirst { 
             val itNorm = it.uidPrefix.replace(" ", "").uppercase()
             itNorm == newUidNorm || (oldPrefixToRemove != null && it.uidPrefix == oldPrefixToRemove)
         }
@@ -134,7 +139,11 @@ class MainViewModel(private val repository: CardRepository) : ViewModel() {
             repository.migrateHistory(oldPrefixToRemove, card.uidPrefix)
         }
 
-        currentCards.add(card.copy(uidPrefix = newUidNorm)) // Guardamos siempre normalizado
+        if (existingIndex != -1) {
+            currentCards[existingIndex] = card.copy(uidPrefix = newUidNorm)
+        } else {
+            currentCards.add(card.copy(uidPrefix = newUidNorm))
+        }
         
         repository.saveCardList(currentCards)
         loadDataAndRefreshDisplay()
@@ -209,6 +218,41 @@ class MainViewModel(private val repository: CardRepository) : ViewModel() {
 
     fun normalizeCard() {
         isNormalizing = true
+    }
+
+    fun restoreOriginalSignature() {
+        val card = savedCards.find { focusedUid.startsWith(it.uidPrefix) }
+        if (card?.initialBlock36 != null) {
+            isSignatureSuccess = true
+            writeManualSignature(card.initialBlock36)
+        }
+    }
+
+    fun saveCurrentSignatureAsOriginal() {
+        val card = savedCards.find { focusedUid.startsWith(it.uidPrefix) }
+        if (card != null && block36Hex.replace(" ", "").length == 32) {
+            val updatedCard = card.copy(initialBlock36 = block36Hex.replace(" ", ""))
+            saveNewCard(updatedCard)
+        }
+    }
+
+    fun writeManualSignature(hex: String) {
+        if (!isSignatureSuccess) isSignatureSuccess = true
+        val fullHex = if (hex.length == 14) {
+            // Si solo nos pasan 7 bytes (14 chars), asumimos que son los bytes 9-15
+            // El bloque 36 completo son 16 bytes.
+            // Necesitamos los primeros 9 bytes del bloque actual para completar los 16.
+            val currentBlock = block36Hex.replace(" ", "")
+            if (currentBlock.length == 32) {
+                currentBlock.substring(0, 18) + hex
+            } else {
+                hex.padStart(32, '0') // Fallback si no hay bloque actual
+            }
+        } else {
+            hex
+        }
+        manualSigHex = fullHex
+        isWritingManualSig = true
     }
 }
 
