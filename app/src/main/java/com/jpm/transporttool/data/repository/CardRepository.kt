@@ -175,6 +175,14 @@ class CardRepository(context: Context) {
         appPrefs.edit().putBoolean("pro_mode", enabled).apply()
     }
 
+    fun getAppTheme(): String {
+        return appPrefs.getString("app_theme", "system") ?: "system"
+    }
+
+    fun setAppTheme(theme: String) {
+        appPrefs.edit().putString("app_theme", theme).apply()
+    }
+
     fun exportData(): String {
         val root = JSONObject()
         val cardsArray = JSONArray()

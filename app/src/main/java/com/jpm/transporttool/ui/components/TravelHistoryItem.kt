@@ -1,6 +1,8 @@
 package com.jpm.transporttool.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,9 +38,10 @@ fun TravelHistoryItem(record: TravelRecord) {
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            containerColor = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f) else Color(0xFFF5F5F5)
         ),
-        shape = MaterialTheme.shapes.medium
+        shape = MaterialTheme.shapes.medium,
+        border = if (!isSystemInDarkTheme()) BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f)) else null
     ) {
         Row(
             modifier = Modifier
@@ -71,12 +74,12 @@ fun TravelHistoryItem(record: TravelRecord) {
                 Text(
                     text = dayFormat.format(date).replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.onSurface else Color.Black
                 )
                 Text(
                     text = day.format(date),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isSystemInDarkTheme()) MaterialTheme.colorScheme.onSurfaceVariant else Color.Gray
                 )
             }
 

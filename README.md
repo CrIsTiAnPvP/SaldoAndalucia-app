@@ -74,7 +74,7 @@ The balance is stored as an integer in a "Value Block" format.
 
 ## 👨‍💻 Authors
 
-- **Jesús Pérez Marinetto** (Main Developer)
+- **Marinetto** (Main Developer)
 - **CrIsTiiAnPvP** (Contributor)
 
 ---

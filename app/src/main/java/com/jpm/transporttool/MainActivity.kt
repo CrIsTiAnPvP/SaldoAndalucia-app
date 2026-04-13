@@ -4,10 +4,12 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,7 +33,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
+        enableEdgeToEdge()
 
         val repository = CardRepository(this)
         viewModel = ViewModelProvider(this, object : ViewModelProvider.Factory {
@@ -47,7 +49,14 @@ class MainActivity : ComponentActivity() {
             var appState by remember { mutableStateOf("splash") }
             val isDisclaimerAccepted = remember { mutableStateOf(viewModel.isDisclaimerAccepted()) }
 
-            JPM_Transport_ToolTheme {
+            val systemDark = isSystemInDarkTheme()
+            val darkTheme = when (viewModel.appTheme) {
+                "light" -> false
+                "dark" -> true
+                else -> systemDark
+            }
+
+            JPM_Transport_ToolTheme(darkTheme = darkTheme) {
                 AnimatedContent(
                     targetState = appState,
                     transitionSpec = {

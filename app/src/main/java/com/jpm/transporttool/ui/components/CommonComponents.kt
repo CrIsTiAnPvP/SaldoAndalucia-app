@@ -27,6 +27,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jpm.transporttool.R
@@ -69,7 +70,8 @@ fun TransportCardItem(
     onEditSave: (String, String) -> Unit = { _, _ -> },
     onDelete: (() -> Unit)? = null,
     initialKeyB: String = "",
-    isProMode: Boolean = false
+    isProMode: Boolean = false,
+    pageOffset: Float = 0f
 ) {
     var isFlipped by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(
@@ -79,11 +81,6 @@ fun TransportCardItem(
     )
 
     val shape = RoundedCornerShape(24.dp)
-    val isJoven = name.contains("Joven", ignoreCase = true) || imageRes == R.drawable.tarjeta_joven
-    val contentColor = if (imageRes != null) {
-        if (isJoven) Color(0xFF00853E) else Color.Black
-    } else Color.White
-
     var editName by remember { mutableStateOf(name) }
     var editKeyB by remember { mutableStateOf(initialKeyB) }
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -109,160 +106,187 @@ fun TransportCardItem(
         )
     }
 
-    Card(
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                rotationY = rotation
-                cameraDistance = 12f * density
-            },
-        shape = shape,
-        elevation = CardDefaults.cardElevation(6.dp)
+            .padding(vertical = 4.dp)
     ) {
-        Box(
+        // Cuadro con el nombre personalizado sobre la tarjeta (con efecto de retraso)
+        Surface(
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+            shape = RoundedCornerShape(12.dp),
             modifier = Modifier
-                .fillMaxSize()
-                .clip(shape)
-                .clickable { if (!isFlipped && isProMode) onRecharge() }
-                .then(
-                    if (imageRes == null) {
-                        Modifier.background(Brush.linearGradient(listOf(color, color.copy(alpha = 0.8f))))
-                    } else {
-                        Modifier.background(Color.White)
-                    }
-                )
+                .align(Alignment.CenterHorizontally)
+                .padding(bottom = 8.dp)
+                .graphicsLayer {
+                    // Aplicamos un desplazamiento horizontal basado en el offset del pager
+                    // Multiplicamos por un factor (ej: 40.dp) para crear el efecto de "retraso" o paralaje
+                    translationX = -pageOffset * 40.dp.toPx()
+                    // También un ligero efecto de transparencia al alejarse del centro
+                    alpha = 1f - (Math.abs(pageOffset) * 0.5f).coerceIn(0f, 1f)
+                }
         ) {
-            if (rotation <= 90f) {
-                if (imageRes != null) {
-                    Image(
-                        painter = painterResource(id = imageRes),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.FillBounds
-                    )
-                }
+            Text(
+                text = name.uppercase(),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                letterSpacing = 1.sp
+            )
+        }
 
-                Column(
-                    modifier = Modifier.padding(
-                        start = 24.dp,
-                        top = if (isJoven) 64.dp else 24.dp
-                    )
-                ) {
-                    if (!isJoven) {
-                        Text(name, color = contentColor.copy(0.7f), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                    }
-                    Text(
-                        text = stringResource(R.string.balance_format, balance),
-                        color = contentColor,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Black
-                    )
-                }
-
-                IconButton(
-                    onClick = { isFlipped = true },
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp)
-                ) {
-                    Icon(Icons.Default.Settings, null, tint = contentColor.copy(alpha = 0.6f))
-                }
-
-                if (!isJoven) {
-                    Text(
-                        stringResource(R.string.card_id, uid),
-                        modifier = Modifier.align(Alignment.BottomStart).padding(24.dp),
-                        color = contentColor.copy(0.5f),
-                        fontSize = 11.sp
-                    )
-                    Icon(
-                        Icons.Default.Nfc,
-                        null,
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp).size(44.dp),
-                        tint = contentColor.copy(0.2f)
-                    )
-                }
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { rotationY = 180f }
-                        .padding(16.dp)
-                ) {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        Column(
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1.586f)
+                .graphicsLayer {
+                    rotationY = rotation
+                    cameraDistance = 12f * density
+                },
+            shape = shape,
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(shape)
+                    .background(Color.White)
+            ) {
+                if (rotation <= 90f) {
+                    // --- PARTE DELANTERA ---
+                    // Imagen 100% pura sin textos superpuestos
+                    if (imageRes != null) {
+                        Image(
+                            painter = painterResource(id = imageRes),
+                            contentDescription = null,
                             modifier = Modifier
-                                .weight(1f)
-                                .verticalScroll(rememberScrollState()),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text("Editar Tarjeta", style = MaterialTheme.typography.titleMedium, color = Color.Black)
+                                .fillMaxSize()
+                                .clickable { if (isProMode) onRecharge() },
+                            contentScale = ContentScale.FillBounds
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(color)
+                                .clickable { if (isProMode) onRecharge() }
+                        )
+                    }
 
-                            Column {
-                                Text("Nombre", color = Color.Black.copy(0.5f), fontSize = 11.sp)
-                                BasicTextField(
-                                    value = editName,
-                                    onValueChange = { editName = it },
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.Black),
-                                    singleLine = true,
-                                    cursorBrush = SolidColor(Color.Black)
-                                )
-                                HorizontalDivider(color = Color.Black.copy(0.2f), thickness = 1.dp)
+                    // Texto del ID en la tarjeta
+                    Text(
+                        text = "ID: $uid",
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(16.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.Black.copy(alpha = 0.5f),
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    // Icono de editar sutil
+                    IconButton(
+                        onClick = { isFlipped = true },
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = null,
+                            tint = Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                } else {
+                    // --- PARTE TRASERA (EDICIÓN) ---
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { rotationY = 180f }
+                            .background(Color.White)
+                            .padding(12.dp)
+                    ) {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Text(
+                                text = "Ajustes de Tarjeta",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
+                            
+                            Spacer(Modifier.height(4.dp))
+
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Column {
+                                    Text("Nombre Personalizado", color = Color.Gray, fontSize = 9.sp)
+                                    BasicTextField(
+                                        value = editName,
+                                        onValueChange = { editName = it },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.Black),
+                                        singleLine = true
+                                    )
+                                    HorizontalDivider(color = Color.Black.copy(alpha = 0.1f))
+                                }
+
+                                if (isProMode) {
+                                    Column {
+                                        Text("Clave B (Solo expertos)", color = Color.Gray, fontSize = 9.sp)
+                                        BasicTextField(
+                                            value = editKeyB,
+                                            onValueChange = { editKeyB = it.uppercase() },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.Black, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                                            singleLine = true
+                                        )
+                                        HorizontalDivider(color = Color.Black.copy(alpha = 0.1f))
+                                    }
+                                }
                             }
 
-                            if (isProMode) {
-                                Column {
-                                    Text("Clave B (Opcional)", color = Color.Black.copy(0.5f), fontSize = 11.sp)
-                                    BasicTextField(
-                                        value = editKeyB,
-                                        onValueChange = { editKeyB = it.uppercase() },
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.Black),
-                                        singleLine = true,
-                                        cursorBrush = SolidColor(Color.Black)
-                                    )
-                                    HorizontalDivider(color = Color.Black.copy(0.2f), thickness = 1.dp)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        onEditSave(editName, editKeyB)
+                                        isFlipped = false
+                                    },
+                                    modifier = Modifier.weight(1f).height(36.dp),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color(0xFFA5D6A7),
+                                        contentColor = Color.Black
+                                    ),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {
+                                    Text("Guardar", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+
+                                if (onDelete != null) {
+                                    OutlinedButton(
+                                        onClick = { showDeleteDialog = true },
+                                        modifier = Modifier.weight(1f).height(36.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red),
+                                        border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.3f)),
+                                        contentPadding = PaddingValues(0.dp)
+                                    ) {
+                                        Text("Eliminar", fontSize = 13.sp)
+                                    }
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        IconButton(
+                            onClick = { isFlipped = false },
+                            modifier = Modifier.align(Alignment.TopEnd)
                         ) {
-                            Button(
-                                onClick = {
-                                    onEditSave(editName, editKeyB)
-                                    isFlipped = false
-                                },
-                                modifier = Modifier.weight(1f).height(40.dp),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                            ) {
-                                Icon(Icons.Default.Save, null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Guardar", fontSize = 12.sp)
-                            }
-
-                            Button(
-                                onClick = { showDeleteDialog = true },
-                                modifier = Modifier.weight(1f).height(40.dp),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(0.8f))
-                            ) {
-                                Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Borrar", fontSize = 12.sp)
-                            }
+                            Icon(Icons.Default.Close, null, tint = Color.Black)
                         }
-                    }
-
-                    IconButton(
-                        onClick = { isFlipped = false },
-                        modifier = Modifier.align(Alignment.TopEnd)
-                    ) {
-                        Icon(Icons.Default.Close, null, tint = if (imageRes != null) Color.Black else Color.White)
                     }
                 }
             }
@@ -278,35 +302,46 @@ fun HistoryItem(
     onDelete: () -> Unit
 ) {
     val sdf = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
-    val (icon, color) = when {
-        prevBalance == null -> null to Color.Transparent
-        entry.balance > prevBalance -> Icons.AutoMirrored.Filled.TrendingUp to Color(0xFF4CAF50)
-        entry.balance < prevBalance -> Icons.AutoMirrored.Filled.TrendingDown to Color(0xFFF44336)
-        else -> Icons.AutoMirrored.Filled.TrendingFlat to Color.Gray
-    }
-
+    
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        shape = RoundedCornerShape(12.dp)
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSystemInDarkTheme()) Color(0xFF1E1E2C) else Color(0xFFF5F5F5)
+        ),
+        shape = RoundedCornerShape(16.dp),
+        border = if (!isSystemInDarkTheme()) BorderStroke(1.dp, Color.Black.copy(alpha = 0.05f)) else null
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (icon != null) {
-                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-            }
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Icono de flecha como en la imagen
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.TrendingFlat,
+                contentDescription = null,
+                tint = if (isSystemInDarkTheme()) Color.Gray else Color(0xFF2E7D32).copy(alpha = 0.6f),
+                modifier = Modifier.size(24.dp)
+            )
+            
+            Spacer(modifier = Modifier.width(20.dp))
+            
             Column(modifier = Modifier.weight(1f)) {
-                Text(sdf.format(Date(entry.timestamp)), style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                Text(
+                    text = sdf.format(Date(entry.timestamp)),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isSystemInDarkTheme()) Color.Gray else Color.Black.copy(alpha = 0.5f)
+                )
                 Text(
                     text = stringResource(R.string.balance_format, entry.balance),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 18.sp,
-                    color = MaterialTheme.colorScheme.onSurface
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isSystemInDarkTheme()) Color.White else Color.Black
                 )
             }
+            
             if (isDeletable) {
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, null, tint = Color.Red.copy(0.4f), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Delete, null, tint = Color.Red.copy(0.3f), modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -412,101 +447,67 @@ fun RechargeDialog(
 fun HistorySection(
     uid: String,
     viewModel: MainViewModel,
+    showTravels: Boolean,
     modifier: Modifier = Modifier
 ) {
     val history = remember(uid, viewModel.refreshTrigger) { viewModel.loadHistoryForUid(uid) }
+    val travels = remember(uid, viewModel.refreshTrigger) { viewModel.getTravelHistoryForUid(uid) }
     var isReadingExpanded by remember { mutableStateOf(false) }
 
-    // 🚨 BORRAMOS la variable currentTravelHistory de aquí
     val displayHistory = if (isReadingExpanded) history else history.take(5)
 
     Column(modifier = modifier) {
-        SecondaryTabRow(
-            selectedTabIndex = if (viewModel.showTravelHistoryOnly) 0 else 1,
-            containerColor = Color.Transparent,
-            divider = {}
-        ) {
-            Tab(
-                selected = viewModel.showTravelHistoryOnly,
-                onClick = { viewModel.showTravelHistoryOnly = true },
-                text = { Text("Últimos Viajes", fontWeight = FontWeight.Bold) }
-            )
-            Tab(
-                selected = !viewModel.showTravelHistoryOnly,
-                onClick = { viewModel.showTravelHistoryOnly = false },
-                text = { Text("Historial Saldo", fontWeight = FontWeight.Bold) }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        AnimatedContent(
-            targetState = viewModel.showTravelHistoryOnly,
-            transitionSpec = {
-                (fadeIn(animationSpec = tween(220, delayMillis = 90)) +
-                        scaleIn(initialScale = 0.92f, animationSpec = tween(220, delayMillis = 90)))
-                    .togetherWith(fadeOut(animationSpec = tween(90)))
-            },
-            label = "history_toggle_anim"
-        ) { showTravels ->
-            if (showTravels) {
-                // --- Vista de Viajes ---
-                Column {
-                    // ✨ SOLUCIÓN: Leemos directamente del viewModel AQUÍ DENTRO.
-                    // Esto obliga a Compose a redibujar la animación en tiempo real.
-                    if (viewModel.travelHistory.isEmpty()) {
+        if (showTravels) {
+            // --- Vista de Viajes ---
+            if (travels.isEmpty()) {
+                Text(
+                    "No se han detectado viajes en esta tarjeta",
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                travels.forEach { record ->
+                    TravelHistoryItem(record = record)
+                }
+            }
+        } else {
+            // --- Vista de Historial de Saldo ---
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (history.size > 5) {
+                    TextButton(
+                        onClick = { isReadingExpanded = !isReadingExpanded },
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
                         Text(
-                            "No se han detectado viajes en esta tarjeta",
-                            modifier = Modifier.padding(vertical = 16.dp),
-                            color = Color.Gray,
-                            style = MaterialTheme.typography.bodyMedium
+                            text = if (isReadingExpanded) "Ver menos" else "Ver todo (${history.size})",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.secondary
                         )
-                    } else {
-                        viewModel.travelHistory.forEach { record ->
-                            TravelHistoryItem(record = record)
-                        }
                     }
                 }
-            } else {
-                // ... (El código de historial de saldo hacia abajo se queda igual) ...
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (history.size > 5) {
-                            TextButton(
-                                onClick = { isReadingExpanded = !isReadingExpanded },
-                                contentPadding = PaddingValues(horizontal = 8.dp)
-                            ) {
-                                Text(
-                                    text = if (isReadingExpanded) "Ver menos" else "Ver todo (${history.size})",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                            }
-                        }
-                    }
+            }
 
-                    if (history.isEmpty()) {
-                        Text(
-                            "No hay lecturas de saldo recientes",
-                            modifier = Modifier.padding(vertical = 16.dp),
-                            color = Color.Gray,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    } else {
-                        displayHistory.forEachIndexed { index, entry ->
-                            val prevBal = history.getOrNull(index + 1)?.balance
-                            HistoryItem(
-                                entry = entry,
-                                prevBalance = prevBal,
-                                isDeletable = entry != history.firstOrNull(),
-                                onDelete = { viewModel.deleteHistoryItem(uid, entry) }
-                            )
-                        }
-                    }
+            if (history.isEmpty()) {
+                Text(
+                    "No hay lecturas de saldo recientes",
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    color = Color.Gray,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                displayHistory.forEachIndexed { index, entry ->
+                    val prevBal = history.getOrNull(index + 1)?.balance
+                    HistoryItem(
+                        entry = entry,
+                        prevBalance = prevBal,
+                        isDeletable = entry != history.firstOrNull(),
+                        onDelete = { viewModel.deleteHistoryItem(uid, entry) }
+                    )
                 }
             }
         }

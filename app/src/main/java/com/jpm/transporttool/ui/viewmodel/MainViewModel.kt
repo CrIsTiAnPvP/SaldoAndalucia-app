@@ -53,16 +53,24 @@ class MainViewModel(private val repository: CardRepository) : ViewModel() {
     var isNormalizing by mutableStateOf(false)
     var isRepairSuccess by mutableStateOf(false)
 
-    var showTravelHistoryOnly by mutableStateOf(true)
+    var showTravelHistoryOnly by mutableStateOf(false)
 
     var refreshTrigger by mutableStateOf(0)
 
     var isProMode by mutableStateOf(false)
         private set
 
+    var appTheme by mutableStateOf("system")
+        private set
+
     fun toggleProMode() {
         isProMode = !isProMode
         repository.setProModeEnabled(isProMode)
+    }
+
+    fun updateAppTheme(theme: String) {
+        appTheme = theme
+        repository.setAppTheme(theme)
     }
 
     fun exportData(): String = repository.exportData()
@@ -80,6 +88,7 @@ class MainViewModel(private val repository: CardRepository) : ViewModel() {
 
     init {
         isProMode = repository.isProModeEnabled()
+        appTheme = repository.getAppTheme()
         loadDataAndRefreshDisplay()
     }
 
@@ -136,8 +145,11 @@ class MainViewModel(private val repository: CardRepository) : ViewModel() {
     }
 
     fun loadTravelsFromDb(uid: String) {
-        val savedTravels = repository.loadTravelHistory(uid)
-        travelHistory = savedTravels.sortedByDescending { it.timestamp }.toList()
+        travelHistory = getTravelHistoryForUid(uid)
+    }
+
+    fun getTravelHistoryForUid(uid: String): List<TravelRecord> {
+        return repository.loadTravelHistory(uid).sortedByDescending { it.timestamp }
     }
 
     fun updateTravelHistory(uid: String, history: List<TravelRecord>) {
@@ -151,9 +163,10 @@ class MainViewModel(private val repository: CardRepository) : ViewModel() {
         }
         Log.d("UI_DEBUG", "=======================================")
 
-        travelHistory = history.sortedByDescending { it.timestamp }.toList()
-
+        val sortedHistory = history.sortedByDescending { it.timestamp }.toList()
+        travelHistory = sortedHistory
         repository.saveTravelHistory(uid, history)
+        refreshTrigger++
     }
 
     fun addToHistory(uid: String, balance: Double) {

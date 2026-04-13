@@ -36,6 +36,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.jpm.transporttool.R
 import com.jpm.transporttool.data.model.TransportCard
 import com.jpm.transporttool.ui.viewmodel.MainViewModel
@@ -43,6 +45,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.TimeZone
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsOverlay(viewModel: MainViewModel, onDismiss: () -> Unit) {
     var showDeleteAllConfirm by remember { mutableStateOf(false) }
@@ -102,60 +105,27 @@ fun SettingsOverlay(viewModel: MainViewModel, onDismiss: () -> Unit) {
         )
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f))
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onDismiss() },
-        contentAlignment = Alignment.Center
-    ) {
-        Surface(
+    if (viewModel.showSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false),
             modifier = Modifier
-                .width(320.dp)
-                .padding(16.dp),
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
-        ) {
+                .padding(24.dp)
+                .fillMaxWidth(),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Settings, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text("Ajustes", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
             Column(
                 modifier = Modifier
-                    .padding(20.dp)
+                    .fillMaxWidth()
                     .verticalScroll(scrollState)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Settings, null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text("Ajustes", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // SECCIÓN MODO PRO
-                Text("Avanzado", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
-                Surface(
-                    color = if (viewModel.isProMode) MaterialTheme.colorScheme.primaryContainer.copy(0.3f) else Color.Transparent,
-                    shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                ) {
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Modo Pro", fontWeight = FontWeight.Bold)
-                                Text("Permite edición de llaves y saldo", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                            }
-                            Switch(
-                                checked = viewModel.isProMode,
-                                onCheckedChange = { viewModel.toggleProMode() }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
 
                 // SECCIÓN DATOS
                 Text("Datos y Respaldo", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
@@ -178,10 +148,6 @@ fun SettingsOverlay(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     onClick = { showImportDialog = true }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                Spacer(modifier = Modifier.height(16.dp))
-
                 SettingsItem(
                     icon = Icons.Default.DeleteForever,
                     title = "Borrar todo",
@@ -189,6 +155,49 @@ fun SettingsOverlay(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     color = Color.Red,
                     onClick = { showDeleteAllConfirm = true }
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // SECCIÓN AVANZADA
+                Text("Avanzado", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    color = if (viewModel.isProMode) MaterialTheme.colorScheme.primaryContainer.copy(0.3f) else Color.Transparent,
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Modo Pro", fontWeight = FontWeight.Bold)
+                                Text("Permite edición de llaves y saldo", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                            }
+                            Switch(
+                                checked = viewModel.isProMode,
+                                onCheckedChange = { viewModel.toggleProMode() }
+                            )
+                        }
+                        
+                        if (viewModel.isProMode) {
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                            SettingsItem(
+                                icon = Icons.Default.BugReport,
+                                title = "Herramientas de Desarrollador",
+                                subtitle = "Depuración y reparación de bloques",
+                                color = MaterialTheme.colorScheme.error,
+                                onClick = { 
+                                    onDismiss()
+                                    viewModel.showDevWarning = true 
+                                }
+                            )
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -206,27 +215,56 @@ fun SettingsOverlay(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     }
                 )
 
-                if (viewModel.isProMode) {
-                    SettingsItem(
-                        icon = Icons.Default.BugReport,
-                        title = "Herramientas de Desarrollador",
-                        subtitle = "Depuración y reparación de bloques",
-                        color = MaterialTheme.colorScheme.error,
-                        onClick = { 
-                            onDismiss()
-                            viewModel.showDevWarning = true 
-                        }
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // SECCIÓN TEMA
+                Text("Apariencia", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    ThemeOption(
+                        label = "Claro",
+                        selected = viewModel.appTheme == "light",
+                        onClick = { viewModel.updateAppTheme("light") }
+                    )
+                    ThemeOption(
+                        label = "Oscuro",
+                        selected = viewModel.appTheme == "dark",
+                        onClick = { viewModel.updateAppTheme("dark") }
+                    )
+                    ThemeOption(
+                        label = "Sistema",
+                        selected = viewModel.appTheme == "system",
+                        onClick = { viewModel.updateAppTheme("system") }
                     )
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                TextButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.align(Alignment.End)
-                ) { Text("Cerrar") }
             }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.padding(8.dp)
+            ) { Text("Cerrar") }
         }
-    }
+    )
+}
+}
+
+@Composable
+fun ThemeOption(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) },
+        leadingIcon = if (selected) {
+            { Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp)) }
+        } else null
+    )
 }
 
 @Composable
@@ -765,6 +803,13 @@ fun DevOptionsDialog(viewModel: MainViewModel, onDismiss: () -> Unit) {
             Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(scrollState)
             ) {
+                val cardCfg = viewModel.savedCards.find { viewModel.focusedUid.startsWith(it.uidPrefix) }
+                Text(
+                    text = cardCfg?.name ?: stringResource(R.string.unknown_card),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
 
                 Text("Integridad de la tarjeta", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
