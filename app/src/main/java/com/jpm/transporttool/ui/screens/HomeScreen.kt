@@ -28,7 +28,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.abs
 import com.jpm.transporttool.R
 import com.jpm.transporttool.ui.components.*
 import com.jpm.transporttool.ui.viewmodel.MainViewModel
@@ -44,8 +43,6 @@ fun HomeScreen(viewModel: MainViewModel) {
     val isAddNewPage = pagerState.settledPage == viewModel.displayUids.size
     val currentUidPager = if (isAddNewPage) null else viewModel.displayUids.getOrNull(pagerState.settledPage)
     val cardCfg = viewModel.savedCards.find { currentUidPager != null && currentUidPager.startsWith(it.uidPrefix) }
-
-    val cardColor = if (isAddNewPage || viewModel.displayUids.isEmpty()) Color.DarkGray else Color(cardCfg?.color ?: Color(0xFF1976D2).toArgb())
 
     LaunchedEffect(viewModel.focusedUid) {
         if (viewModel.displayUids.isNotEmpty() && viewModel.focusedUid.isNotEmpty()) {
@@ -131,7 +128,6 @@ fun HomeScreen(viewModel: MainViewModel) {
                         pageSpacing = 16.dp,
                         modifier = Modifier.fillMaxWidth().wrapContentHeight()
                     ) { page ->
-                        // Calculamos el desplazamiento relativo de la página respecto al centro del pager
                         val pageOffset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
 
                         if (page < viewModel.displayUids.size) {
@@ -174,11 +170,14 @@ fun HomeScreen(viewModel: MainViewModel) {
                                     { viewModel.deleteCardConfig(cfg.uidPrefix) }
                                 } else null,
                                 isProMode = viewModel.isProMode,
-                                pageOffset = pageOffset
+                                pageOffset = pageOffset,
+                                isCorrupted = viewModel.isCardCorrupted,
+                                isSyncError = viewModel.isSyncError,
+                                isSignatureError = viewModel.isSignatureError,
+                                isCounterError = viewModel.isCounterError
                             )
                         } else {
                             Column(modifier = Modifier.fillMaxWidth()) {
-                                // Espacio para alinear con las otras tarjetas que tienen nombre arriba
                                 Spacer(modifier = Modifier.height(34.dp))
                                 AddNewCardButton { viewModel.isScanningForNewCard = true }
                             }
@@ -278,7 +277,37 @@ fun HomeScreen(viewModel: MainViewModel) {
                         )
 
                         Column {
-                            // Cabecera del historial desplegable
+                            // Indicador de estado de la tarjeta
+                            val hasError = viewModel.isCardCorrupted || viewModel.isSyncError || 
+                                           viewModel.isSignatureError || viewModel.isCounterError
+                            
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (hasError) Icons.Default.Warning else Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = if (hasError) Color.Red else Color(0xFF4CAF50),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = when {
+                                        viewModel.isCardCorrupted -> "Bloques corruptos detectados"
+                                        viewModel.isSignatureError -> "Firma de seguridad inválida"
+                                        viewModel.isSyncError -> "Error de sincronización"
+                                        viewModel.isCounterError -> "Contador desincronizado"
+                                        else -> "Tarjeta en buen estado"
+                                    },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (hasError) Color.Red else Color.Gray,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -301,7 +330,6 @@ fun HomeScreen(viewModel: MainViewModel) {
                                 )
                             }
                             
-                            // Contenido que se despliega
                             AnimatedVisibility(
                                 visible = isHistoryExpanded,
                                 enter = expandVertically(animationSpec = tween(300)) + fadeIn(),
@@ -404,6 +432,16 @@ fun HomeScreen(viewModel: MainViewModel) {
             )
         }
 
+        if (viewModel.isWritingManualSig) {
+            val cardCfg = viewModel.savedCards.find { viewModel.focusedUid.startsWith(it.uidPrefix) }
+            WritingOverlay(
+                amount = 0f,
+                cardName = cardCfg?.name ?: stringResource(R.string.unknown_card),
+                isWritingSignature = true,
+                onDismiss = { viewModel.isWritingManualSig = false }
+            )
+        }
+
         if (viewModel.showLegalDialog) {
             LegalDialog(onDismiss = { viewModel.showLegalDialog = false })
         }
@@ -447,9 +485,20 @@ fun HomeScreen(viewModel: MainViewModel) {
                     onDismiss = { viewModel.showDevOptionsDialog = false }
                 )
             } else {
-                // Reset flag if pro mode was disabled
                 viewModel.showDevOptionsDialog = false
             }
+        }
+
+        if (viewModel.showSuccess) {
+            SuccessOverlay(
+                amount = viewModel.finalAmount,
+                isRepair = viewModel.isRepairSuccess,
+                isManualSignature = viewModel.isWritingManualSig,
+                onDismiss = { 
+                    viewModel.showSuccess = false 
+                    viewModel.isRepairSuccess = false
+                }
+            )
         }
     }
 }

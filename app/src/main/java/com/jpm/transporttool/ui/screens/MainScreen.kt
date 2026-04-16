@@ -45,15 +45,17 @@ fun MainScreen(viewModel: MainViewModel) {
             ScanningOverlay(onDismiss = { viewModel.isScanningForNewCard = false })
         }
 
-        if (viewModel.isWaitingToWrite || viewModel.isNormalizing) {
+        if (viewModel.isWaitingToWrite || viewModel.isNormalizing || viewModel.isWritingManualSig) {
             val cardCfg = viewModel.savedCards.find { viewModel.focusedUid.startsWith(it.uidPrefix) }
             WritingOverlay(
-                amount = if (viewModel.isNormalizing) 0f else viewModel.finalAmount,
+                amount = if (viewModel.isNormalizing || viewModel.isWritingManualSig) 0f else viewModel.finalAmount,
                 cardName = cardCfg?.name ?: stringResource(R.string.unknown_card),
                 isNormalizing = viewModel.isNormalizing,
+                isWritingSignature = viewModel.isWritingManualSig,
                 onDismiss = { 
                     viewModel.isWaitingToWrite = false
                     viewModel.isNormalizing = false
+                    viewModel.isWritingManualSig = false
                 }
             )
         }

@@ -10,7 +10,8 @@ data class TransportCard(
     val uidPrefix: String,
     val keyB: String,
     val color: Int = Color(0xFF1976D2).toArgb(),
-    val type: CardType = CardType.UNKNOWN
+    val type: CardType = CardType.UNKNOWN,
+    val initialBlock36: String? = null
 )
 
 enum class CardType(val label: String, val defaultColor: Color, val imageRes: Int?, val contentColor: Color = Color.White) {

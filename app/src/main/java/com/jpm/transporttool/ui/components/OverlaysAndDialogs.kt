@@ -415,7 +415,7 @@ fun NfcAnimation(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun WritingOverlay(amount: Float, cardName: String, isNormalizing: Boolean = false, onDismiss: () -> Unit) {
+fun WritingOverlay(amount: Float, cardName: String, isNormalizing: Boolean = false, isWritingSignature: Boolean = false, onDismiss: () -> Unit) {
     BackHandler { onDismiss() }
 
     Box(
@@ -431,13 +431,17 @@ fun WritingOverlay(amount: Float, cardName: String, isNormalizing: Boolean = fal
             
             Spacer(modifier = Modifier.height(32.dp))
             Text(
-                if (isNormalizing) "Reparando tarjeta..." else stringResource(R.string.writing_balance_title),
+                when {
+                    isNormalizing -> "Reparando tarjeta..."
+                    isWritingSignature -> "Escribiendo firma manual..."
+                    else -> stringResource(R.string.writing_balance_title)
+                },
                 color = Color.White,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
-            if (!isNormalizing) {
+            if (!isNormalizing && !isWritingSignature) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = stringResource(R.string.writing_balance_msg, amount.toDouble()),
@@ -519,10 +523,10 @@ fun FallingBills() {
 }
 
 @Composable
-fun SuccessOverlay(amount: Float, isRepair: Boolean = false, onDismiss: () -> Unit) {
+fun SuccessOverlay(amount: Float, isRepair: Boolean = false, isManualSignature: Boolean = false, onDismiss: () -> Unit) {
     val animProgress = remember { Animatable(0f) }
     val checkAnim = remember { Animatable(0f) }
-    val showBills = amount >= 50f && !isRepair
+    val showBills = amount >= 50f && !isRepair && !isManualSignature
     var startFalling by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -555,8 +559,13 @@ fun SuccessOverlay(amount: Float, isRepair: Boolean = false, onDismiss: () -> Un
             }
             Spacer(modifier = Modifier.height(40.dp)); AnimatedVisibility(visible = animProgress.value > 0.8f, enter = slideInVertically { it } + fadeIn()) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(if (isRepair) "Tarjeta reparada" else stringResource(R.string.operation_completed), color = Color.White.copy(0.7f), fontSize = 16.sp); 
-                if (!isRepair) {
+                val title = when {
+                    isRepair -> "Tarjeta reparada"
+                    isManualSignature -> "Firma actualizada"
+                    else -> stringResource(R.string.operation_completed)
+                }
+                Text(title, color = Color.White.copy(0.7f), fontSize = 16.sp); 
+                if (!isRepair && !isManualSignature) {
                     Spacer(modifier = Modifier.height(8.dp)); 
                     Text(stringResource(R.string.balance_format, amount), color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.graphicsLayer(scaleX = checkAnim.value, scaleY = checkAnim.value))
                 }
@@ -979,6 +988,8 @@ fun DevOptionsDialog(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     }
                 }
 
+
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text("Firma y Seguridad (Bloque 36)", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
@@ -1068,33 +1079,58 @@ fun DevOptionsDialog(viewModel: MainViewModel, onDismiss: () -> Unit) {
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            val card = viewModel.savedCards.find { viewModel.focusedUid.startsWith(it.uidPrefix) }
+                            
+                            Button(
+                                onClick = { viewModel.saveCurrentSignatureAsOriginal() },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Icon(Icons.Default.Save, null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Guardar Actual", fontSize = 11.sp)
+                            }
+
+                            Button(
+                                onClick = { 
+                                    onDismiss()
+                                    viewModel.restoreOriginalSignature() 
+                                },
+                                modifier = Modifier.weight(1f),
+                                enabled = card?.initialBlock36 != null,
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Icon(Icons.Default.Restore, null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Restaurar", fontSize = 11.sp)
+                            }
+
+                            Button(
+                                onClick = { viewModel.showManualSigDialog = true },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Manual (7B)", fontSize = 11.sp)
+                            }
+                        }
                     }
                 }
 
-                if (viewModel.showCounterFixConfirm) {
-                    AlertDialog(
-                        onDismissRequest = { viewModel.showCounterFixConfirm = false },
-                        title = { Text("¿Fijar contador a 49?") },
-                        text = { Text("Se recomienda mantener el contador original de la tarjeta. Solo cámbialo a 49 si la tarjeta no funciona en validadores oficiales. Esta acción es irreversible.") },
-                        confirmButton = {
-                            Button(
-                                onClick = {
-                                    viewModel.showCounterFixConfirm = false
-                                    onDismiss()
-                                    viewModel.normalizeCard()
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                            ) {
-                                Text("Fijar a 49")
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { viewModel.showCounterFixConfirm = false }) {
-                                Text("Cancelar")
-                            }
-                        }
-                    )
-                }
+
+
+
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -1142,6 +1178,8 @@ fun DevOptionsDialog(viewModel: MainViewModel, onDismiss: () -> Unit) {
                     }
                 }
 
+
+
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("UID: ${viewModel.focusedUid}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
             }
@@ -1156,6 +1194,73 @@ fun DevOptionsDialog(viewModel: MainViewModel, onDismiss: () -> Unit) {
             }
         }
     )
+
+    if (viewModel.showManualSigDialog) {
+        var textState by remember { 
+            val current = viewModel.block36Hex.replace(" ", "")
+            mutableStateOf(if (current.length == 32) current.substring(18) else "") 
+        }
+        AlertDialog(
+            onDismissRequest = { viewModel.showManualSigDialog = false },
+            title = { Text("Editar Firma (Bytes 9-15)") },
+            text = {
+                Column {
+                    Text("Introduce los 7 bytes de la firma real (14 caracteres hex):", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextField(
+                        value = textState,
+                        onValueChange = { if (it.length <= 14) textState = it.uppercase().filter { c -> c in "0123456789ABCDEF" } },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                        singleLine = true
+                    )
+                    Text("${textState.length}/14 caracteres", style = MaterialTheme.typography.labelSmall, modifier = Modifier.align(Alignment.End))
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.showManualSigDialog = false
+                        onDismiss()
+                        viewModel.writeManualSignature(textState)
+                    },
+                    enabled = textState.length == 14
+                ) {
+                    Text("Escribir Firma")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.showManualSigDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    if (viewModel.showCounterFixConfirm) {
+        AlertDialog(
+            onDismissRequest = { viewModel.showCounterFixConfirm = false },
+            title = { Text("¿Fijar contador a 49?") },
+            text = { Text("Se recomienda mantener el contador original de la tarjeta. Solo cámbialo a 49 si la tarjeta no funciona en validadores oficiales. Esta acción es irreversible.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.showCounterFixConfirm = false
+                        onDismiss()
+                        viewModel.normalizeCard()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Fijar a 49")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.showCounterFixConfirm = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 }
 
 @Composable
